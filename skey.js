@@ -112,72 +112,73 @@ function pebble_chain() {
   chain.initialize = function(num_iterations, seed) {
     chain.state = {
       current: 0,
-      num_iterations: num_iterations,
-      log_num_iterations: log2(num_iterations),
+      num: num_iterations,
+      log_num: log2(num_iterations),
       p: []
     }
 
     var i;
     var k;
-    var value;
-    // TODO: Need to optimize the following code
-    for (i = 0; i < chain.state.log_num_iterations; ++i) {
-      value = seed;
-      for (k = 0; k < num_iterations - pow2(i + 1) + 1; ++k)
+    var value = hash(seed);
+    chain.state.p.unshift({
+      start_inc: 3 * pow2(chain.state.log_num),
+      dest_inc: 2 * pow2(chain.state.log_num),
+      pos: pow2(chain.state.log_num),
+      dest: pow2(chain.state.log_num),
+      value: value
+    });
+
+    for (i = chain.state.log_num - 1; i >= 1; --i) {
+      for (k = 0; k < pow2(i); ++k)
         value = hash(value);
 
-      chain.state.p.push({
-        start_inc: 3 * pow2(i+1),
-        dest_inc: 2 * pow2(i+1),
-        pos: pow2(i+1),
-        dest: pow2(i+1),
+      chain.state.p.unshift({
+        start_inc: 3 * pow2(i),
+        dest_inc: 2 * pow2(i),
+        pos: pow2(i),
+        dest: pow2(i),
         value: value
       });
     }
 
-    var initial = seed;
-    for (i = 0; i < num_iterations + 1; ++i)
-      initial = hash(initial);
-
+    var initial = hash(hash(value));
     return initial;
   }
 
   chain.advance = function() {
     // Implement Fractal hash sequence of Jakobsson
     var state = chain.state;
-    if (state.current == state.num_iterations)
+    if (state.current == state.num)
       return null;
 
     state.current += 1;
-    for (var i = 0; i < state.log_num_iterations; ++i) {
+    for (var i = 0; i < state.log_num; ++i) {
       if (state.p[i].pos != state.p[i].dest) {
         state.p[i].pos -= 2;
         state.p[i].value = hash(hash(state.p[i].value));
       }
     }
 
-    var value;
-    if (state.current % 2 == 1) {
-      value = hash(state.p[0].value);
-    } else {
-      value = state.p[0].value;
-      state.p[0].pos += state.p[0].start_inc;
-      state.p[0].dest += state.p[0].dest_inc;
-      if (state.p[0].dest > state.num_iterations) {
-        state.p[0].dest = Number.POSITIVE_INFINITY;
-        state.p[0].pos = Number.POSITIVE_INFINITY;
-      } else {
-        for (var i = 1; i < state.log_num_iterations; ++i)
-          if (state.p[i].pos == state.p[0].pos) {
-            state.p[0].value = state.p[i].value;
-            break;
-          }
-      }
+    if (state.current % 2 == 1)
+      return hash(state.p[0].value);
 
-      state.p.sort(function (p1, p2) {
-        return p1.dest - p2.dest;
-      });
+    var value = state.p[0].value;
+    state.p[0].pos += state.p[0].start_inc;
+    state.p[0].dest += state.p[0].dest_inc;
+    if (state.p[0].dest > state.num) {
+      state.p[0].dest = Number.POSITIVE_INFINITY;
+      state.p[0].pos = Number.POSITIVE_INFINITY;
+    } else {
+      for (var i = 1; i < state.log_num; ++i)
+        if (state.p[i].pos == state.p[0].pos) {
+          state.p[0].value = state.p[i].value;
+          break;
+        }
     }
+
+    state.p.sort(function (p1, p2) {
+      return p1.dest - p2.dest;
+    });
 
     return value;
   }
